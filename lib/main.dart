@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart'; // Import for Clipboard
+import 'package:flutter/services.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:fluttertoast/fluttertoast.dart';
-import 'package.flutter_spinkit/flutter_spinkit.dart';
-import 'package:url_launcher/url_launcher.dart'; // <<< NAYA IMPORT: URL launcher ke liye
-import 'utils/dio_download.dart';
+import 'package:flutter_spinkit/flutter_spinkit.dart';
+import 'package:url_launcher/url_launcher.dart';
+import 'utils/dio_download.dart'; // Yeh import zaroori hai
 
 void main() {
   runApp(const ParrotDownloaderApp());
@@ -17,11 +17,11 @@ class ParrotDownloaderApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return MaterialApp(
       title: 'Parrot Downloader',
+      debugShowCheckedModeBanner: false,
       theme: ThemeData(
         primarySwatch: Colors.blue,
         fontFamily: 'Roboto',
         useMaterial3: true,
-        // Define a custom color scheme for a more modern look
         colorScheme: ColorScheme.fromSwatch(primarySwatch: Colors.blue).copyWith(
           secondary: Colors.orangeAccent,
           background: Colors.blue.shade50,
@@ -89,27 +89,25 @@ class _HomeScreenState extends State<HomeScreen> {
   String? _videoUrl;
   String? _thumbnailUrl;
   String? _title;
-  String? _rawApiResponse; // New variable to store raw API response
-  bool _autoDownloadEnabled = true; // New variable for auto-download toggle
+  String? _rawApiResponse;
+  bool _autoDownloadEnabled = true;
 
   @override
   void initState() {
     super.initState();
     _requestPermissions();
     
-    // <<< NAYA FEATURE: App shuru hone ke baad dialog dikhaye
-    // WidgetsBinding.instance.addPostFrameCallback ka istemal isliye kiya gaya hai
-    // taake UI poori tarah build hone ke baad dialog show ho.
+    // <<< YEH SECTION HAR BAAR DIALOG DIKHATA HAI >>>
+    // Jab bhi yeh screen khulegi, yeh code dialog ko screen par le aayega.
     WidgetsBinding.instance.addPostFrameCallback((_) {
       _showJoinTelegramDialog(context);
     });
   }
 
-  // <<< NAYA FUNCTION: Telegram join karne ka dialog show karne ke liye
   Future<void> _showJoinTelegramDialog(BuildContext context) async {
     showDialog(
       context: context,
-      barrierDismissible: false, // User dialog ke bahar tap karke isko band nahi kar sakta
+      barrierDismissible: false,
       builder: (BuildContext context) {
         return AlertDialog(
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
@@ -120,13 +118,12 @@ class _HomeScreenState extends State<HomeScreen> {
               Text('Join Our Community'),
             ],
           ),
-          content: const Text(
-            'Stay updated with the latest news and features by joining our Telegram channel.'),
+          content: const Text('Stay updated with the latest news and features by joining our Telegram channel.'),
           actions: <Widget>[
             TextButton(
               child: const Text('Maybe Later'),
               onPressed: () {
-                Navigator.of(context).pop(); // Dialog ko band karein
+                Navigator.of(context).pop();
               },
             ),
             ElevatedButton(
@@ -137,12 +134,10 @@ class _HomeScreenState extends State<HomeScreen> {
               child: const Text('Join Channel'),
               onPressed: () async {
                 final Uri url = Uri.parse('https://t.me/Waqas_Mood');
-                // URL launch karne ki koshish karein
                 if (!await launchUrl(url, mode: LaunchMode.externalApplication)) {
-                  // Agar fail ho jaye to user ko batayein
                   _showToast('Could not launch Telegram. Please check if it is installed.');
                 }
-                Navigator.of(context).pop(); // Action ke baad dialog band karein
+                Navigator.of(context).pop();
               },
             ),
           ],
@@ -152,18 +147,17 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Future<void> _requestPermissions() async {
-    await [
-      Permission.storage,
-      Permission.manageExternalStorage,
-      Permission.notification,
-    ].request();
+    // Android ke naye versions ke liye storage permission ki zaroorat nahi agar aap GallerySaver istemal kar rahe hain.
+    // Sirf notification ki permission maangna behtar hai.
+    await Permission.notification.request();
   }
 
   bool _isValidUrl(String url) {
     return url.contains('facebook.com') || 
            url.contains('fb.watch') || 
            url.contains('instagram.com') ||
-           url.contains('instagr.am');
+           url.contains('instagr.am') ||
+           url.contains('threads.net'); // Threads support
   }
 
   void _showToast(String message) {
@@ -195,7 +189,7 @@ class _HomeScreenState extends State<HomeScreen> {
     }
 
     if (!_isValidUrl(url)) {
-      _showToast('Please enter a valid Facebook or Instagram URL');
+      _showToast('Please enter a valid Facebook, Instagram or Threads URL');
       return;
     }
 
@@ -206,7 +200,7 @@ class _HomeScreenState extends State<HomeScreen> {
       _videoUrl = null;
       _thumbnailUrl = null;
       _title = null;
-      _rawApiResponse = null; // Clear previous response
+      _rawApiResponse = null;
     });
 
     try {
@@ -217,31 +211,34 @@ class _HomeScreenState extends State<HomeScreen> {
         setState(() {
           _videoUrl = result['videoUrl'];
           _thumbnailUrl = result['thumbnail'];
-          _title = result['title'] ?? 'Video';
-          _rawApiResponse = result['rawResponse']; // Store raw response
+          // Title mein ghalat characters ko hata dein jo file name mein masla kar sakte hain
+          _title = result['title']?.replaceAll(RegExp(r'[^\w\s.-]'),'').trim() ?? 'video';
+          _rawApiResponse = result['rawResponse'];
           _statusMessage = 'Video found! Ready to download.';
         });
-        // Auto-start download if enabled
+
         if (_autoDownloadEnabled) {
           _downloadVideo();
         }
       } else {
         setState(() {
-          _statusMessage = 'Failed to get video information';
-          _rawApiResponse = 'No video information found or API response was null.'; // Indicate no info
+          _statusMessage = 'Failed to get video information. The URL might be private or invalid.';
+          _rawApiResponse = 'No video information found or API response was null.';
         });
         _showToast('Failed to process URL');
       }
     } catch (e) {
       setState(() {
         _statusMessage = 'Error: ${e.toString()}';
-        _rawApiResponse = 'Error during API call: ${e.toString()}'; // Show error in raw response area
+        _rawApiResponse = 'Error during API call: ${e.toString()}';
       });
       _showToast('Error processing URL');
     } finally {
-      setState(() {
-        _isLoading = false;
-      });
+      if (!_autoDownloadEnabled || _videoUrl == null) {
+        setState(() {
+          _isLoading = false;
+        });
+      }
     }
   }
 
@@ -270,13 +267,12 @@ class _HomeScreenState extends State<HomeScreen> {
         },
       );
 
-      // Download thumbnail if available
       if (_thumbnailUrl != null) {
         await downloader.downloadThumbnail(_thumbnailUrl!, _title ?? 'thumbnail');
       }
 
       setState(() {
-        _statusMessage = 'Download completed successfully!';
+        _statusMessage = 'Download completed successfully! Saved to Gallery.';
       });
       _showToast('Video downloaded successfully!');
     } catch (e) {
@@ -318,7 +314,6 @@ class _HomeScreenState extends State<HomeScreen> {
               children: [
                 const SizedBox(height: 20),
                 
-                // App Icon and Title
                 Column(
                   children: [
                     Container(
@@ -343,11 +338,11 @@ class _HomeScreenState extends State<HomeScreen> {
                     ),
                     const SizedBox(height: 24),
                     Text(
-                      'Download Facebook & Instagram Videos',
+                      'Download FB, Insta & Threads Videos',
                       style: TextStyle(
                         fontSize: 20,
                         fontWeight: FontWeight.w700,
-                        color: Theme.of(context).colorScheme.onPrimary,
+                        color: Colors.white,
                         shadows: [
                           Shadow(
                             blurRadius: 4.0,
@@ -363,11 +358,10 @@ class _HomeScreenState extends State<HomeScreen> {
                 
                 const SizedBox(height: 40),
                 
-                // URL Input Field
                 TextField(
                   controller: _urlController,
                   decoration: InputDecoration(
-                    hintText: 'Paste Facebook or Instagram video URL here...', 
+                    hintText: 'Paste video URL here...', 
                     prefixIcon: Icon(Icons.link, color: Theme.of(context).colorScheme.primary),
                     suffixIcon: IconButton(
                       icon: Icon(Icons.paste, color: Theme.of(context).colorScheme.primary),
@@ -380,7 +374,6 @@ class _HomeScreenState extends State<HomeScreen> {
                 
                 const SizedBox(height: 24),
 
-                // Auto-download toggle
                 SwitchListTile(
                   title: const Text(
                     'Auto-start Download',
@@ -401,12 +394,11 @@ class _HomeScreenState extends State<HomeScreen> {
                 
                 const SizedBox(height: 24),
                 
-                // Process URL Button
                 ElevatedButton(
                   onPressed: _isLoading ? null : _processUrl,
                   style: ElevatedButton.styleFrom(
                     backgroundColor: Theme.of(context).colorScheme.secondary,
-                    foregroundColor: Theme.of(context).colorScheme.onSecondary,
+                    foregroundColor: Colors.white,
                   ),
                   child: _isLoading && _videoUrl == null
                       ? const SpinKitThreeBounce(
@@ -418,8 +410,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 
                 const SizedBox(height: 32),
                 
-                // Video Preview and Download Section
-                if (_videoUrl != null) ...[
+                if (_videoUrl != null && !_isLoading) ...[
                   Card(
                     elevation: 8,
                     shape: RoundedRectangleBorder(
@@ -471,11 +462,7 @@ class _HomeScreenState extends State<HomeScreen> {
                                 backgroundColor: Colors.green.shade600,
                                 foregroundColor: Colors.white,
                               ),
-                              child: _isLoading && _downloadProgress > 0
-                                  ? Text(
-                                      'Downloading... ${(_downloadProgress * 100).toInt()}%',
-                                    )
-                                  : const Text('Download Video'),
+                              child: const Text('Download Video'),
                             ),
                           ),
                         ],
@@ -486,8 +473,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 
                 const SizedBox(height: 24),
                 
-                // Progress Bar
-                if (_downloadProgress > 0) ...[
+                if (_isLoading && _downloadProgress > 0) ...[
                   Card(
                     elevation: 8,
                     shape: RoundedRectangleBorder(
@@ -506,7 +492,7 @@ class _HomeScreenState extends State<HomeScreen> {
                           ),
                           const SizedBox(height: 12),
                           Text(
-                            '${(_downloadProgress * 100).toInt()}% completed',
+                            _statusMessage,
                             style: TextStyle(
                               fontWeight: FontWeight.w600,
                               color: Theme.of(context).colorScheme.onSurface,
@@ -517,64 +503,27 @@ class _HomeScreenState extends State<HomeScreen> {
                     ),
                   ),
                 ],
-                
-                // Raw API Response for Debugging
-                if (_rawApiResponse != null) ...[
-                  const SizedBox(height: 24),
-                  Card(
-                    elevation: 8,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(16),
-                    ),
-                    color: Colors.grey.shade100,
-                    child: Padding(
-                      padding: const EdgeInsets.all(20.0),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text(
-                            'Raw API Response (for debugging):',
-                            style: TextStyle(
-                              fontWeight: FontWeight.bold,
-                              fontSize: 14,
-                              color: Theme.of(context).colorScheme.onSurface,
-                            ),
-                          ),
-                          const SizedBox(height: 10),
-                          Text(
-                            _rawApiResponse!,
-                            style: const TextStyle(
-                              fontFamily: 'monospace',
-                              fontSize: 12,
-                              color: Colors.black87,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                ],
 
-                const SizedBox(height: 24),
-                
-                // Status Message
-                if (_statusMessage.isNotEmpty)
-                  Card(
-                    elevation: 8,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(16),
-                    ),
-                    color: Colors.blue.shade100,
-                    child: Padding(
-                      padding: const EdgeInsets.all(20.0),
-                      child: Text(
-                        _statusMessage,
-                        style: TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.w600,
-                          color: Colors.blue.shade800,
+                if (_statusMessage.isNotEmpty && !_isLoading)
+                  Padding(
+                    padding: const EdgeInsets.only(top: 24.0),
+                    child: Card(
+                      elevation: 8,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(16),
+                      ),
+                      color: Colors.blue.shade100,
+                      child: Padding(
+                        padding: const EdgeInsets.all(20.0),
+                        child: Text(
+                          _statusMessage,
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w600,
+                            color: Colors.blue.shade800,
+                          ),
+                          textAlign: TextAlign.center,
                         ),
-                        textAlign: TextAlign.center,
                       ),
                     ),
                   ),
