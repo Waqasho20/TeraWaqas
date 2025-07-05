@@ -210,16 +210,33 @@ class _HomeScreenState extends State<HomeScreen> {
 
   // Function to open Telegram channel
   Future<void> _openTelegramChannel() async {
-    const telegramUrl = 'https://t.me/Waqas_Mood';
-    try {
-      final Uri url = Uri.parse(telegramUrl);
-      if (await canLaunchUrl(url)) {
-        await launchUrl(url, mode: LaunchMode.externalApplication);
-      } else {
-        _showToast('Could not open Telegram channel');
+    // Try multiple URL formats for better compatibility
+    final List<String> telegramUrls = [
+      'tg://resolve?domain=Waqas_Mood',  // Telegram app deep link
+      'https://t.me/Waqas_Mood',        // Web link
+      'https://telegram.me/Waqas_Mood', // Alternative web link
+    ];
+    
+    bool linkOpened = false;
+    
+    for (String telegramUrl in telegramUrls) {
+      try {
+        final Uri url = Uri.parse(telegramUrl);
+        if (await canLaunchUrl(url)) {
+          await launchUrl(url, mode: LaunchMode.externalApplication);
+          linkOpened = true;
+          _showToast('Opening Telegram channel...');
+          break;
+        }
+      } catch (e) {
+        print('Failed to open $telegramUrl: ${e.toString()}');
+        continue;
       }
-    } catch (e) {
-      _showToast('Error opening Telegram channel');
+    }
+    
+    if (!linkOpened) {
+      _showToast('Could not open Telegram channel. Please install Telegram app or visit t.me/Waqas_Mood manually.');
+      print('All Telegram URL attempts failed');
     }
   }
 
@@ -545,7 +562,7 @@ class _HomeScreenState extends State<HomeScreen> {
                               ),
                               child: _isLoading && _downloadProgress > 0
                                   ? Text(
-                                      'Downloading... ${(_downloadProgress * 100).toInt()}%',
+                                      'Downloading... ${(progress * 100).toInt()}%',
                                     )
                                   : const Text('Download Video'),
                             ),
