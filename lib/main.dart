@@ -40,6 +40,7 @@ class _HomeScreenState extends State<HomeScreen> {
   String? _videoUrl;
   String? _thumbnailUrl;
   String? _title;
+  String? _rawApiResponse; // New variable to store raw API response
 
   @override
   void initState() {
@@ -92,6 +93,7 @@ class _HomeScreenState extends State<HomeScreen> {
       _videoUrl = null;
       _thumbnailUrl = null;
       _title = null;
+      _rawApiResponse = null; // Clear previous response
     });
 
     try {
@@ -103,17 +105,20 @@ class _HomeScreenState extends State<HomeScreen> {
           _videoUrl = result['videoUrl'];
           _thumbnailUrl = result['thumbnail'];
           _title = result['title'] ?? 'Video';
+          _rawApiResponse = result['rawResponse']; // Store raw response
           _statusMessage = 'Video found! Ready to download.';
         });
       } else {
         setState(() {
           _statusMessage = 'Failed to get video information';
+          _rawApiResponse = 'No video information found or API response was null.'; // Indicate no info
         });
         _showToast('Failed to process URL');
       }
     } catch (e) {
       setState(() {
         _statusMessage = 'Error: ${e.toString()}';
+        _rawApiResponse = 'Error during API call: ${e.toString()}'; // Show error in raw response area
       });
       _showToast('Error processing URL');
     } finally {
@@ -410,6 +415,38 @@ class _HomeScreenState extends State<HomeScreen> {
                   ),
                 ],
                 
+                // Raw API Response for Debugging
+                if (_rawApiResponse != null) ...[
+                  const SizedBox(height: 20),
+                  Container(
+                    padding: const EdgeInsets.all(15),
+                    decoration: BoxDecoration(
+                      color: Colors.grey[200],
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text(
+                          'Raw API Response (for debugging):',
+                          style: TextStyle(
+                            fontWeight: FontWeight.bold,
+                            fontSize: 12,
+                          ),
+                        ),
+                        const SizedBox(height: 5),
+                        Text(
+                          _rawApiResponse!,
+                          style: const TextStyle(
+                            fontFamily: 'monospace',
+                            fontSize: 10,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+
                 const Spacer(),
                 
                 // Status Message
