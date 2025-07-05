@@ -233,8 +233,8 @@ class _HomeScreenState extends State<HomeScreen> {
             begin: Alignment.topLeft,
             end: Alignment.bottomRight,
             colors: [
-              Theme.of(context).colorScheme.primary.shade700,
-              Theme.of(context).colorScheme.primary.shade300,
+              Colors.blue.shade700,
+              Colors.blue.shade300,
               Theme.of(context).colorScheme.background,
             ],
             stops: const [0.1, 0.5, 0.9],
@@ -469,7 +469,7 @@ class _HomeScreenState extends State<HomeScreen> {
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(16),
                     ),
-                    color: Theme.of(context).colorScheme.primary.shade100,
+                    color: Colors.blue.shade100,
                     child: Padding(
                       padding: const EdgeInsets.all(20.0),
                       child: Text(
@@ -477,7 +477,7 @@ class _HomeScreenState extends State<HomeScreen> {
                         style: TextStyle(
                           fontSize: 16,
                           fontWeight: FontWeight.w600,
-                          color: Theme.of(context).colorScheme.primary.shade800,
+                          color: Colors.blue.shade800,
                         ),
                         textAlign: TextAlign.center,
                       ),
