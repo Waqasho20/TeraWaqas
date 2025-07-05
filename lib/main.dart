@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart'; // Import for Clipboard
 import 'package:permission_handler/permission_handler.dart';
 import 'package:fluttertoast/fluttertoast.dart';
 import 'package:flutter_spinkit/flutter_spinkit.dart';
@@ -88,6 +89,7 @@ class _HomeScreenState extends State<HomeScreen> {
   String? _thumbnailUrl;
   String? _title;
   String? _rawApiResponse; // New variable to store raw API response
+  bool _autoDownloadEnabled = true; // New variable for auto-download toggle
 
   @override
   void initState() {
@@ -118,6 +120,16 @@ class _HomeScreenState extends State<HomeScreen> {
       backgroundColor: Colors.black87,
       textColor: Colors.white,
     );
+  }
+
+  Future<void> _pasteFromClipboard() async {
+    final clipboardData = await Clipboard.getData(Clipboard.kTextPlain);
+    if (clipboardData != null && clipboardData.text != null) {
+      _urlController.text = clipboardData.text!;
+      _showToast('URL pasted from clipboard');
+    } else {
+      _showToast('No text found in clipboard');
+    }
   }
 
   Future<void> _processUrl() async {
@@ -155,6 +167,10 @@ class _HomeScreenState extends State<HomeScreen> {
           _rawApiResponse = result['rawResponse']; // Store raw response
           _statusMessage = 'Video found! Ready to download.';
         });
+        // Auto-start download if enabled
+        if (_autoDownloadEnabled) {
+          _downloadVideo();
+        }
       } else {
         setState(() {
           _statusMessage = 'Failed to get video information';
@@ -299,9 +315,34 @@ class _HomeScreenState extends State<HomeScreen> {
                   decoration: InputDecoration(
                     hintText: 'Paste Facebook or Instagram video URL here...', 
                     prefixIcon: Icon(Icons.link, color: Theme.of(context).colorScheme.primary),
+                    suffixIcon: IconButton(
+                      icon: Icon(Icons.paste, color: Theme.of(context).colorScheme.primary),
+                      onPressed: _pasteFromClipboard,
+                    ),
                   ),
                   maxLines: 3,
                   minLines: 1,
+                ),
+                
+                const SizedBox(height: 24),
+
+                // Auto-download toggle
+                SwitchListTile(
+                  title: const Text(
+                    'Auto-start Download',
+                    style: TextStyle(
+                      fontWeight: FontWeight.w600,
+                      color: Colors.black87,
+                    ),
+                  ),
+                  value: _autoDownloadEnabled,
+                  onChanged: (bool value) {
+                    setState(() {
+                      _autoDownloadEnabled = value;
+                    });
+                  },
+                  activeColor: Theme.of(context).colorScheme.secondary,
+                  contentPadding: EdgeInsets.zero,
                 ),
                 
                 const SizedBox(height: 24),
@@ -497,4 +538,5 @@ class _HomeScreenState extends State<HomeScreen> {
     super.dispose();
   }
 }
+
 
