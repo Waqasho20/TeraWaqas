@@ -1,168 +1,483 @@
-import 'dart:io';
-import 'package:dio/dio.dart';
-import 'package:flutter/foundation.dart';
+import 'package:flutter/material.dart';
+import 'package:permission_handler/permission_handler.dart';
+import 'package:fluttertoast/fluttertoast.dart';
+import 'package:flutter_spinkit/flutter_spinkit.dart';
+import 'utils/dio_download.dart';
 
-class DioDownloader {
-  final Dio _dio = Dio();
-  
-  DioDownloader() {
-    _dio.options.headers = {
-      'x-api-key': 'pxrAEVHPV2S0yczPyv9bE9n8JryVwJAw',
-      'content-type': 'application/json; charset=utf-8',
-      'user-agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-    };
-  }
+void main() {
+  runApp(const ParrotDownloaderApp());
+}
 
-  Future<Map<String, dynamic>?> getVideoInfo(String url) async {
-    try {
-      final response = await _dio.post(
-        'https://tera.backend.live/allinone',
-        data: {'url': url},
-      );
+class ParrotDownloaderApp extends StatelessWidget {
+  const ParrotDownloaderApp({super.key});
 
-      if (response.statusCode == 200 && response.data != null) {
-        final data = response.data;
-        
-        String? videoUrl;
-        String? thumbnail;
-        String? title;
-
-        if (data is Map) {
-          // Prioritize 'video' key as per the working Python script
-          if (data['video'] != null && data['video'] is List && (data['video'] as List).isNotEmpty) {
-            final videoEntry = (data['video'] as List)[0];
-            if (videoEntry is Map) {
-              videoUrl = videoEntry['video'] ?? videoEntry['url'];
-              thumbnail = videoEntry['thumbnail'];
-              title = videoEntry['title'] ?? videoEntry['name'] ?? videoEntry['filename'];
-            } else if (videoEntry is String) {
-              videoUrl = videoEntry;
-            }
-          }
-
-          // Fallback to other common keys if 'video' key doesn't provide the URL
-          videoUrl = videoUrl ?? data['url'] ?? data['video_url'] ?? data['videoUrl'] ?? data['download_url'] ?? data['downloadUrl'];
-          thumbnail = thumbnail ?? data['thumbnail'] ?? data['thumb'] ?? data['image'] ?? data['preview'];
-          title = title ?? data['title'] ?? data['name'] ?? data['filename'];
-
-          // If data has a 'data' field, check inside it
-          if (data['data'] != null && data['data'] is Map) {
-            final innerData = data['data'];
-            videoUrl = videoUrl ?? innerData['url'] ?? innerData['video_url'] ?? innerData['videoUrl'] ?? innerData['download_url'] ?? innerData['downloadUrl'];
-            thumbnail = thumbnail ?? innerData['thumbnail'] ?? innerData['thumb'] ?? innerData['image'] ?? innerData['preview'];
-            title = title ?? innerData['title'] ?? innerData['name'] ?? innerData['filename'];
-          }
-
-          // If data has a 'result' field, check inside it
-          if (data['result'] != null && data['result'] is Map) {
-            final resultData = data['result'];
-            videoUrl = videoUrl ?? resultData['url'] ?? resultData['video_url'] ?? resultData['videoUrl'] ?? resultData['download_url'] ?? resultData['downloadUrl'];
-            thumbnail = thumbnail ?? resultData['thumbnail'] ?? resultData['thumb'] ?? resultData['image'] ?? resultData['preview'];
-            title = title ?? resultData['title'] ?? resultData['name'] ?? resultData['filename'];
-          }
-        }
-
-        if (videoUrl != null && videoUrl.isNotEmpty) {
-          return {
-            'videoUrl': videoUrl,
-            'thumbnail': thumbnail,
-            'title': title ?? 'Video',
-          };
-        }
-      }
-      
-      return null;
-    } catch (e) {
-      debugPrint('Error getting video info: $e');
-      return null;
-    }
-  }
-
-  Future<void> downloadVideo(
-    String videoUrl, 
-    String filename, {
-    Function(double)? onProgress,
-  }) async {
-    try {
-      // Create ParrotDownloader directory
-      final directory = Directory('/storage/emulated/0/ParrotDownloader');
-      if (!await directory.exists()) {
-        await directory.create(recursive: true);
-      }
-
-      // Generate timestamped filename
-      final timestamp = DateTime.now().millisecondsSinceEpoch;
-      final extension = _getFileExtension(videoUrl);
-      final finalFilename = '${filename}_$timestamp$extension';
-      final filePath = '${directory.path}/$finalFilename';
-
-      // Download the video
-      await _dio.download(
-        videoUrl,
-        filePath,
-        onReceiveProgress: (received, total) {
-          if (total != -1 && onProgress != null) {
-            final progress = received / total;
-            onProgress(progress);
-          }
-        },
-      );
-
-      debugPrint('Video downloaded to: $filePath');
-    } catch (e) {
-      debugPrint('Error downloading video: $e');
-      rethrow;
-    }
-  }
-
-  Future<void> downloadThumbnail(String thumbnailUrl, String filename) async {
-    try {
-      // Create Pictures directory path
-      final directory = Directory('/storage/emulated/0/Pictures');
-      if (!await directory.exists()) {
-        await directory.create(recursive: true);
-      }
-
-      // Generate timestamped filename for thumbnail
-      final timestamp = DateTime.now().millisecondsSinceEpoch;
-      final extension = _getFileExtension(thumbnailUrl);
-      final finalFilename = '${filename}_thumb_$timestamp$extension';
-      final filePath = '${directory.path}/$finalFilename';
-
-      // Download the thumbnail
-      await _dio.download(thumbnailUrl, filePath);
-
-      debugPrint('Thumbnail downloaded to: $filePath');
-    } catch (e) {
-      debugPrint('Error downloading thumbnail: $e');
-      // Don't throw error for thumbnail download failure
-    }
-  }
-
-  String _getFileExtension(String url) {
-    try {
-      final uri = Uri.parse(url);
-      final path = uri.path;
-      final lastDot = path.lastIndexOf('.');
-      
-      if (lastDot != -1 && lastDot < path.length - 1) {
-        final extension = path.substring(lastDot);
-        // Common video extensions
-        if (['.mp4', '.avi', '.mov', '.mkv', '.webm', '.flv'].contains(extension.toLowerCase())) {
-          return extension;
-        }
-        // Common image extensions
-        if (['.jpg', '.jpeg', '.png', '.gif', '.webp'].contains(extension.toLowerCase())) {
-          return extension;
-        }
-      }
-      
-      // Default to .mp4 for videos, .jpg for images
-      return url.contains('thumb') || url.contains('image') ? '.jpg' : '.mp4';
-    } catch (e) {
-      return '.mp4';
-    }
+  @override
+  Widget build(BuildContext context) {
+    return MaterialApp(
+      title: 'Parrot Downloader',
+      theme: ThemeData(
+        primarySwatch: Colors.blue,
+        fontFamily: 'Roboto',
+        useMaterial3: true,
+      ),
+      home: const HomeScreen(),
+    );
   }
 }
 
+class HomeScreen extends StatefulWidget {
+  const HomeScreen({super.key});
+
+  @override
+  State<HomeScreen> createState() => _HomeScreenState();
+}
+
+class _HomeScreenState extends State<HomeScreen> {
+  final TextEditingController _urlController = TextEditingController();
+  bool _isLoading = false;
+  double _downloadProgress = 0.0;
+  String _statusMessage = '';
+  String? _videoUrl;
+  String? _thumbnailUrl;
+  String? _title;
+  String? _rawApiResponse; // New variable to store raw API response
+
+  @override
+  void initState() {
+    super.initState();
+    _requestPermissions();
+  }
+
+  Future<void> _requestPermissions() async {
+    await [
+      Permission.storage,
+      Permission.manageExternalStorage,
+      Permission.notification,
+    ].request();
+  }
+
+  bool _isValidUrl(String url) {
+    return url.contains('facebook.com') || 
+           url.contains('fb.watch') || 
+           url.contains('instagram.com') ||
+           url.contains('instagr.am');
+  }
+
+  void _showToast(String message) {
+    Fluttertoast.showToast(
+      msg: message,
+      toastLength: Toast.LENGTH_SHORT,
+      gravity: ToastGravity.BOTTOM,
+      backgroundColor: Colors.black87,
+      textColor: Colors.white,
+    );
+  }
+
+  Future<void> _processUrl() async {
+    final url = _urlController.text.trim();
+    
+    if (url.isEmpty) {
+      _showToast('Please enter a URL');
+      return;
+    }
+
+    if (!_isValidUrl(url)) {
+      _showToast('Please enter a valid Facebook or Instagram URL');
+      return;
+    }
+
+    setState(() {
+      _isLoading = true;
+      _statusMessage = 'Processing URL...';
+      _downloadProgress = 0.0;
+      _videoUrl = null;
+      _thumbnailUrl = null;
+      _title = null;
+      _rawApiResponse = null; // Clear previous response
+    });
+
+    try {
+      final downloader = DioDownloader();
+      final result = await downloader.getVideoInfo(url);
+      
+      if (result != null) {
+        setState(() {
+          _videoUrl = result['videoUrl'];
+          _thumbnailUrl = result['thumbnail'];
+          _title = result['title'] ?? 'Video';
+          _rawApiResponse = result['rawResponse']; // Store raw response
+          _statusMessage = 'Video found! Ready to download.';
+        });
+      } else {
+        setState(() {
+          _statusMessage = 'Failed to get video information';
+          _rawApiResponse = 'No video information found or API response was null.'; // Indicate no info
+        });
+        _showToast('Failed to process URL');
+      }
+    } catch (e) {
+      setState(() {
+        _statusMessage = 'Error: ${e.toString()}';
+        _rawApiResponse = 'Error during API call: ${e.toString()}'; // Show error in raw response area
+      });
+      _showToast('Error processing URL');
+    } finally {
+      setState(() {
+        _isLoading = false;
+      });
+    }
+  }
+
+  Future<void> _downloadVideo() async {
+    if (_videoUrl == null) {
+      _showToast('No video URL available');
+      return;
+    }
+
+    setState(() {
+      _isLoading = true;
+      _statusMessage = 'Starting download...';
+      _downloadProgress = 0.0;
+    });
+
+    try {
+      final downloader = DioDownloader();
+      await downloader.downloadVideo(
+        _videoUrl!,
+        _title ?? 'video',
+        onProgress: (progress) {
+          setState(() {
+            _downloadProgress = progress;
+            _statusMessage = 'Downloading... ${(progress * 100).toInt()}%';
+          });
+        },
+      );
+
+      // Download thumbnail if available
+      if (_thumbnailUrl != null) {
+        await downloader.downloadThumbnail(_thumbnailUrl!, _title ?? 'thumbnail');
+      }
+
+      setState(() {
+        _statusMessage = 'Download completed successfully!';
+      });
+      _showToast('Video downloaded successfully!');
+    } catch (e) {
+      setState(() {
+        _statusMessage = 'Download failed: ${e.toString()}';
+      });
+      _showToast('Download failed');
+    } finally {
+      setState(() {
+        _isLoading = false;
+      });
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text(
+          'Parrot Downloader',
+          style: TextStyle(
+            fontWeight: FontWeight.bold,
+            color: Colors.white,
+          ),
+        ),
+        backgroundColor: Colors.blue[700],
+        elevation: 0,
+      ),
+      body: Container(
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+            colors: [
+              Colors.blue[700]!,
+              Colors.blue[50]!,
+            ],
+          ),
+        ),
+        child: SafeArea(
+          child: Padding(
+            padding: const EdgeInsets.all(20.0),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: [
+                const SizedBox(height: 20),
+                
+                // App Icon and Title
+                Column(
+                  children: [
+                    Container(
+                      width: 80,
+                      height: 80,
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        borderRadius: BorderRadius.circular(20),
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withOpacity(0.1),
+                            blurRadius: 10,
+                            offset: const Offset(0, 5),
+                          ),
+                        ],
+                      ),
+                      child: const Icon(
+                        Icons.download,
+                        size: 40,
+                        color: Colors.blue,
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    const Text(
+                      'Download Facebook & Instagram Videos',
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.w600,
+                        color: Colors.white,
+                      ),
+                      textAlign: TextAlign.center,
+                    ),
+                  ],
+                ),
+                
+                const SizedBox(height: 40),
+                
+                // URL Input Field
+                Container(
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(15),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withOpacity(0.1),
+                        blurRadius: 10,
+                        offset: const Offset(0, 5),
+                      ),
+                    ],
+                  ),
+                  child: TextField(
+                    controller: _urlController,
+                    decoration: const InputDecoration(
+                      hintText: 'Paste Facebook or Instagram video URL here...',
+                      prefixIcon: Icon(Icons.link, color: Colors.blue),
+                      border: InputBorder.none,
+                      contentPadding: EdgeInsets.all(20),
+                    ),
+                    maxLines: 3,
+                    minLines: 1,
+                  ),
+                ),
+                
+                const SizedBox(height: 20),
+                
+                // Process URL Button
+                ElevatedButton(
+                  onPressed: _isLoading ? null : _processUrl,
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.orange,
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(vertical: 16),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(15),
+                    ),
+                    elevation: 5,
+                  ),
+                  child: _isLoading && _videoUrl == null
+                      ? const SpinKitThreeBounce(
+                          color: Colors.white,
+                          size: 20,
+                        )
+                      : const Text(
+                          'Process URL',
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                ),
+                
+                const SizedBox(height: 20),
+                
+                // Video Preview and Download Section
+                if (_videoUrl != null) ...[
+                  Container(
+                    padding: const EdgeInsets.all(20),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(15),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withOpacity(0.1),
+                          blurRadius: 10,
+                          offset: const Offset(0, 5),
+                        ),
+                      ],
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          _title ?? 'Video',
+                          style: const TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.bold,
+                          ),
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                        const SizedBox(height: 10),
+                        if (_thumbnailUrl != null)
+                          ClipRRect(
+                            borderRadius: BorderRadius.circular(10),
+                            child: Image.network(
+                              _thumbnailUrl!,
+                              height: 150,
+                              width: double.infinity,
+                              fit: BoxFit.cover,
+                              errorBuilder: (context, error, stackTrace) {
+                                return Container(
+                                  height: 150,
+                                  color: Colors.grey[300],
+                                  child: const Icon(
+                                    Icons.video_library,
+                                    size: 50,
+                                    color: Colors.grey,
+                                  ),
+                                );
+                              },
+                            ),
+                          ),
+                        const SizedBox(height: 15),
+                        SizedBox(
+                          width: double.infinity,
+                          child: ElevatedButton(
+                            onPressed: _isLoading ? null : _downloadVideo,
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: Colors.green,
+                              foregroundColor: Colors.white,
+                              padding: const EdgeInsets.symmetric(vertical: 16),
+                              shape: RoundedRectangleBorder(
+                                borderRadius: BorderRadius.circular(10),
+                              ),
+                            ),
+                            child: _isLoading && _downloadProgress > 0
+                                ? Text(
+                                    'Downloading... ${(_downloadProgress * 100).toInt()}%',
+                                    style: const TextStyle(fontWeight: FontWeight.bold),
+                                  )
+                                : const Text(
+                                    'Download Video',
+                                    style: TextStyle(fontWeight: FontWeight.bold),
+                                  ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+                
+                const SizedBox(height: 20),
+                
+                // Progress Bar
+                if (_downloadProgress > 0) ...[
+                  Container(
+                    padding: const EdgeInsets.all(15),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(15),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withOpacity(0.1),
+                          blurRadius: 10,
+                          offset: const Offset(0, 5),
+                        ),
+                      ],
+                    ),
+                    child: Column(
+                      children: [
+                        LinearProgressIndicator(
+                          value: _downloadProgress,
+                          backgroundColor: Colors.grey[300],
+                          valueColor: AlwaysStoppedAnimation<Color>(Colors.green),
+                        ),
+                        const SizedBox(height: 10),
+                        Text(
+                          '${(_downloadProgress * 100).toInt()}% completed',
+                          style: const TextStyle(
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+                
+                // Raw API Response for Debugging
+                if (_rawApiResponse != null) ...[
+                  const SizedBox(height: 20),
+                  Container(
+                    padding: const EdgeInsets.all(15),
+                    decoration: BoxDecoration(
+                      color: Colors.grey[200],
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text(
+                          'Raw API Response (for debugging):',
+                          style: TextStyle(
+                            fontWeight: FontWeight.bold,
+                            fontSize: 12,
+                          ),
+                        ),
+                        const SizedBox(height: 5),
+                        Text(
+                          _rawApiResponse!,
+                          style: const TextStyle(
+                            fontFamily: 'monospace',
+                            fontSize: 10,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+
+                const Spacer(),
+                
+                // Status Message
+                if (_statusMessage.isNotEmpty)
+                  Container(
+                    padding: const EdgeInsets.all(15),
+                    decoration: BoxDecoration(
+                      color: Colors.white.withOpacity(0.9),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: Text(
+                      _statusMessage,
+                      style: const TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w500,
+                      ),
+                      textAlign: TextAlign.center,
+                    ),
+                  ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  @override
+  void dispose() {
+    _urlController.dispose();
+    super.dispose();
+  }
+}
 
