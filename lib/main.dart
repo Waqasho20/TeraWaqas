@@ -354,7 +354,7 @@ class _HomeScreenState extends State<HomeScreen> {
         onProgress: (progress) {
           setState(() {
             _downloadProgress = progress;
-            _statusMessage = 'Downloading... ${(progress * 100).toInt()}%';
+            _statusMessage = 'Downloading... ${(_downloadProgress * 100).toInt()}%';
           });
         },
       );
@@ -562,7 +562,7 @@ class _HomeScreenState extends State<HomeScreen> {
                               ),
                               child: _isLoading && _downloadProgress > 0
                                   ? Text(
-                                      'Downloading... ${(progress * 100).toInt()}%',
+                                      'Downloading... ${(_downloadProgress * 100).toInt()}%',
                                     )
                                   : const Text('Download Video'),
                             ),
