@@ -2,7 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart'; // Import for Clipboard
 import 'package:permission_handler/permission_handler.dart';
 import 'package:fluttertoast/fluttertoast.dart';
-import 'package:flutter_spinkit/flutter_spinkit.dart';
+import 'package.flutter_spinkit/flutter_spinkit.dart';
+import 'package:url_launcher/url_launcher.dart'; // <<< NAYA IMPORT: URL launcher ke liye
 import 'utils/dio_download.dart';
 
 void main() {
@@ -95,6 +96,59 @@ class _HomeScreenState extends State<HomeScreen> {
   void initState() {
     super.initState();
     _requestPermissions();
+    
+    // <<< NAYA FEATURE: App shuru hone ke baad dialog dikhaye
+    // WidgetsBinding.instance.addPostFrameCallback ka istemal isliye kiya gaya hai
+    // taake UI poori tarah build hone ke baad dialog show ho.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _showJoinTelegramDialog(context);
+    });
+  }
+
+  // <<< NAYA FUNCTION: Telegram join karne ka dialog show karne ke liye
+  Future<void> _showJoinTelegramDialog(BuildContext context) async {
+    showDialog(
+      context: context,
+      barrierDismissible: false, // User dialog ke bahar tap karke isko band nahi kar sakta
+      builder: (BuildContext context) {
+        return AlertDialog(
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
+          title: const Row(
+            children: [
+              Icon(Icons.send, color: Colors.blueAccent),
+              SizedBox(width: 10),
+              Text('Join Our Community'),
+            ],
+          ),
+          content: const Text(
+            'Stay updated with the latest news and features by joining our Telegram channel.'),
+          actions: <Widget>[
+            TextButton(
+              child: const Text('Maybe Later'),
+              onPressed: () {
+                Navigator.of(context).pop(); // Dialog ko band karein
+              },
+            ),
+            ElevatedButton(
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.blue.shade700,
+                foregroundColor: Colors.white,
+              ),
+              child: const Text('Join Channel'),
+              onPressed: () async {
+                final Uri url = Uri.parse('https://t.me/Waqas_Mood');
+                // URL launch karne ki koshish karein
+                if (!await launchUrl(url, mode: LaunchMode.externalApplication)) {
+                  // Agar fail ho jaye to user ko batayein
+                  _showToast('Could not launch Telegram. Please check if it is installed.');
+                }
+                Navigator.of(context).pop(); // Action ke baad dialog band karein
+              },
+            ),
+          ],
+        );
+      },
+    );
   }
 
   Future<void> _requestPermissions() async {
@@ -538,5 +592,3 @@ class _HomeScreenState extends State<HomeScreen> {
     super.dispose();
   }
 }
-
-
