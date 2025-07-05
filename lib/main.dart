@@ -1,10 +1,10 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
+import 'package:flutter/services.dart'; // Import for Clipboard
 import 'package:permission_handler/permission_handler.dart';
 import 'package:fluttertoast/fluttertoast.dart';
 import 'package:flutter_spinkit/flutter_spinkit.dart';
-import 'package:url_launcher/url_launcher.dart';
-import 'utils/dio_download.dart'; // Yeh import zaroori hai
+import 'package:url_launcher/url_launcher.dart'; // Add this import for opening URLs
+import 'utils/dio_download.dart';
 
 void main() {
   runApp(const ParrotDownloaderApp());
@@ -17,11 +17,11 @@ class ParrotDownloaderApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return MaterialApp(
       title: 'Parrot Downloader',
-      debugShowCheckedModeBanner: false,
       theme: ThemeData(
         primarySwatch: Colors.blue,
         fontFamily: 'Roboto',
         useMaterial3: true,
+        // Define a custom color scheme for a more modern look
         colorScheme: ColorScheme.fromSwatch(primarySwatch: Colors.blue).copyWith(
           secondary: Colors.orangeAccent,
           background: Colors.blue.shade50,
@@ -89,56 +89,118 @@ class _HomeScreenState extends State<HomeScreen> {
   String? _videoUrl;
   String? _thumbnailUrl;
   String? _title;
-  String? _rawApiResponse;
-  bool _autoDownloadEnabled = true;
+  String? _rawApiResponse; // New variable to store raw API response
+  bool _autoDownloadEnabled = true; // New variable for auto-download toggle
 
   @override
   void initState() {
     super.initState();
     _requestPermissions();
-    
-    // <<< YEH SECTION HAR BAAR DIALOG DIKHATA HAI >>>
-    // Jab bhi yeh screen khulegi, yeh code dialog ko screen par le aayega.
+    // Show welcome popup after the widget is built
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      _showJoinTelegramDialog(context);
+      _showWelcomeDialog();
     });
   }
 
-  Future<void> _showJoinTelegramDialog(BuildContext context) async {
+  // Welcome Dialog Function
+  void _showWelcomeDialog() {
     showDialog(
       context: context,
-      barrierDismissible: false,
+      barrierDismissible: false, // User must tap button to close
       builder: (BuildContext context) {
         return AlertDialog(
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(15)),
-          title: const Row(
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(20),
+          ),
+          title: Row(
             children: [
-              Icon(Icons.send, color: Colors.blueAccent),
-              SizedBox(width: 10),
-              Text('Join Our Community'),
+              Icon(
+                Icons.waving_hand,
+                color: Colors.orange,
+                size: 28,
+              ),
+              const SizedBox(width: 10),
+              const Text(
+                'Welcome!',
+                style: TextStyle(
+                  fontSize: 24,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.blue,
+                ),
+              ),
             ],
           ),
-          content: const Text('Stay updated with the latest news and features by joining our Telegram channel.'),
-          actions: <Widget>[
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(
+                Icons.telegram,
+                size: 60,
+                color: Colors.blue,
+              ),
+              const SizedBox(height: 16),
+              const Text(
+                'Welcome To Our App\nJoin For Updates Our Telegram Channel',
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w500,
+                  color: Colors.black87,
+                  height: 1.4,
+                ),
+              ),
+            ],
+          ),
+          actions: [
+            // OK Button
             TextButton(
-              child: const Text('Maybe Later'),
               onPressed: () {
                 Navigator.of(context).pop();
               },
-            ),
-            ElevatedButton(
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.blue.shade700,
-                foregroundColor: Colors.white,
+              style: TextButton.styleFrom(
+                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(10),
+                ),
               ),
-              child: const Text('Join Channel'),
-              onPressed: () async {
-                final Uri url = Uri.parse('https://t.me/Waqas_Mood');
-                if (!await launchUrl(url, mode: LaunchMode.externalApplication)) {
-                  _showToast('Could not launch Telegram. Please check if it is installed.');
-                }
+              child: const Text(
+                'OK',
+                style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w600,
+                  color: Colors.grey,
+                ),
+              ),
+            ),
+            // Telegram Button
+            ElevatedButton(
+              onPressed: () {
+                _openTelegramChannel();
                 Navigator.of(context).pop();
               },
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.blue,
+                foregroundColor: Colors.white,
+                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                elevation: 3,
+              ),
+              child: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(Icons.telegram, size: 20),
+                  const SizedBox(width: 8),
+                  const Text(
+                    'Telegram',
+                    style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ],
+              ),
             ),
           ],
         );
@@ -146,18 +208,34 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
+  // Function to open Telegram channel
+  Future<void> _openTelegramChannel() async {
+    const telegramUrl = 'https://t.me/Waqas_Mood';
+    try {
+      final Uri url = Uri.parse(telegramUrl);
+      if (await canLaunchUrl(url)) {
+        await launchUrl(url, mode: LaunchMode.externalApplication);
+      } else {
+        _showToast('Could not open Telegram channel');
+      }
+    } catch (e) {
+      _showToast('Error opening Telegram channel');
+    }
+  }
+
   Future<void> _requestPermissions() async {
-    // Android ke naye versions ke liye storage permission ki zaroorat nahi agar aap GallerySaver istemal kar rahe hain.
-    // Sirf notification ki permission maangna behtar hai.
-    await Permission.notification.request();
+    await [
+      Permission.storage,
+      Permission.manageExternalStorage,
+      Permission.notification,
+    ].request();
   }
 
   bool _isValidUrl(String url) {
     return url.contains('facebook.com') || 
            url.contains('fb.watch') || 
            url.contains('instagram.com') ||
-           url.contains('instagr.am') ||
-           url.contains('threads.net'); // Threads support
+           url.contains('instagr.am');
   }
 
   void _showToast(String message) {
@@ -189,7 +267,7 @@ class _HomeScreenState extends State<HomeScreen> {
     }
 
     if (!_isValidUrl(url)) {
-      _showToast('Please enter a valid Facebook, Instagram or Threads URL');
+      _showToast('Please enter a valid Facebook or Instagram URL');
       return;
     }
 
@@ -200,7 +278,7 @@ class _HomeScreenState extends State<HomeScreen> {
       _videoUrl = null;
       _thumbnailUrl = null;
       _title = null;
-      _rawApiResponse = null;
+      _rawApiResponse = null; // Clear previous response
     });
 
     try {
@@ -211,34 +289,31 @@ class _HomeScreenState extends State<HomeScreen> {
         setState(() {
           _videoUrl = result['videoUrl'];
           _thumbnailUrl = result['thumbnail'];
-          // Title mein ghalat characters ko hata dein jo file name mein masla kar sakte hain
-          _title = result['title']?.replaceAll(RegExp(r'[^\w\s.-]'),'').trim() ?? 'video';
-          _rawApiResponse = result['rawResponse'];
+          _title = result['title'] ?? 'Video';
+          _rawApiResponse = result['rawResponse']; // Store raw response
           _statusMessage = 'Video found! Ready to download.';
         });
-
+        // Auto-start download if enabled
         if (_autoDownloadEnabled) {
           _downloadVideo();
         }
       } else {
         setState(() {
-          _statusMessage = 'Failed to get video information. The URL might be private or invalid.';
-          _rawApiResponse = 'No video information found or API response was null.';
+          _statusMessage = 'Failed to get video information';
+          _rawApiResponse = 'No video information found or API response was null.'; // Indicate no info
         });
         _showToast('Failed to process URL');
       }
     } catch (e) {
       setState(() {
         _statusMessage = 'Error: ${e.toString()}';
-        _rawApiResponse = 'Error during API call: ${e.toString()}';
+        _rawApiResponse = 'Error during API call: ${e.toString()}'; // Show error in raw response area
       });
       _showToast('Error processing URL');
     } finally {
-      if (!_autoDownloadEnabled || _videoUrl == null) {
-        setState(() {
-          _isLoading = false;
-        });
-      }
+      setState(() {
+        _isLoading = false;
+      });
     }
   }
 
@@ -267,12 +342,13 @@ class _HomeScreenState extends State<HomeScreen> {
         },
       );
 
+      // Download thumbnail if available
       if (_thumbnailUrl != null) {
         await downloader.downloadThumbnail(_thumbnailUrl!, _title ?? 'thumbnail');
       }
 
       setState(() {
-        _statusMessage = 'Download completed successfully! Saved to Gallery.';
+        _statusMessage = 'Download completed successfully!';
       });
       _showToast('Video downloaded successfully!');
     } catch (e) {
@@ -314,6 +390,7 @@ class _HomeScreenState extends State<HomeScreen> {
               children: [
                 const SizedBox(height: 20),
                 
+                // App Icon and Title
                 Column(
                   children: [
                     Container(
@@ -338,11 +415,11 @@ class _HomeScreenState extends State<HomeScreen> {
                     ),
                     const SizedBox(height: 24),
                     Text(
-                      'Download FB, Insta & Threads Videos',
+                      'Download Facebook & Instagram Videos',
                       style: TextStyle(
                         fontSize: 20,
                         fontWeight: FontWeight.w700,
-                        color: Colors.white,
+                        color: Theme.of(context).colorScheme.onPrimary,
                         shadows: [
                           Shadow(
                             blurRadius: 4.0,
@@ -358,10 +435,11 @@ class _HomeScreenState extends State<HomeScreen> {
                 
                 const SizedBox(height: 40),
                 
+                // URL Input Field
                 TextField(
                   controller: _urlController,
                   decoration: InputDecoration(
-                    hintText: 'Paste video URL here...', 
+                    hintText: 'Paste Facebook or Instagram video URL here...', 
                     prefixIcon: Icon(Icons.link, color: Theme.of(context).colorScheme.primary),
                     suffixIcon: IconButton(
                       icon: Icon(Icons.paste, color: Theme.of(context).colorScheme.primary),
@@ -374,6 +452,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 
                 const SizedBox(height: 24),
 
+                // Auto-download toggle
                 SwitchListTile(
                   title: const Text(
                     'Auto-start Download',
@@ -394,11 +473,12 @@ class _HomeScreenState extends State<HomeScreen> {
                 
                 const SizedBox(height: 24),
                 
+                // Process URL Button
                 ElevatedButton(
                   onPressed: _isLoading ? null : _processUrl,
                   style: ElevatedButton.styleFrom(
                     backgroundColor: Theme.of(context).colorScheme.secondary,
-                    foregroundColor: Colors.white,
+                    foregroundColor: Theme.of(context).colorScheme.onSecondary,
                   ),
                   child: _isLoading && _videoUrl == null
                       ? const SpinKitThreeBounce(
@@ -410,7 +490,8 @@ class _HomeScreenState extends State<HomeScreen> {
                 
                 const SizedBox(height: 32),
                 
-                if (_videoUrl != null && !_isLoading) ...[
+                // Video Preview and Download Section
+                if (_videoUrl != null) ...[
                   Card(
                     elevation: 8,
                     shape: RoundedRectangleBorder(
@@ -462,7 +543,11 @@ class _HomeScreenState extends State<HomeScreen> {
                                 backgroundColor: Colors.green.shade600,
                                 foregroundColor: Colors.white,
                               ),
-                              child: const Text('Download Video'),
+                              child: _isLoading && _downloadProgress > 0
+                                  ? Text(
+                                      'Downloading... ${(_downloadProgress * 100).toInt()}%',
+                                    )
+                                  : const Text('Download Video'),
                             ),
                           ),
                         ],
@@ -473,7 +558,8 @@ class _HomeScreenState extends State<HomeScreen> {
                 
                 const SizedBox(height: 24),
                 
-                if (_isLoading && _downloadProgress > 0) ...[
+                // Progress Bar
+                if (_downloadProgress > 0) ...[
                   Card(
                     elevation: 8,
                     shape: RoundedRectangleBorder(
@@ -492,7 +578,7 @@ class _HomeScreenState extends State<HomeScreen> {
                           ),
                           const SizedBox(height: 12),
                           Text(
-                            _statusMessage,
+                            '${(_downloadProgress * 100).toInt()}% completed',
                             style: TextStyle(
                               fontWeight: FontWeight.w600,
                               color: Theme.of(context).colorScheme.onSurface,
@@ -503,27 +589,64 @@ class _HomeScreenState extends State<HomeScreen> {
                     ),
                   ),
                 ],
-
-                if (_statusMessage.isNotEmpty && !_isLoading)
-                  Padding(
-                    padding: const EdgeInsets.only(top: 24.0),
-                    child: Card(
-                      elevation: 8,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(16),
-                      ),
-                      color: Colors.blue.shade100,
-                      child: Padding(
-                        padding: const EdgeInsets.all(20.0),
-                        child: Text(
-                          _statusMessage,
-                          style: TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.w600,
-                            color: Colors.blue.shade800,
+                
+                // Raw API Response for Debugging
+                if (_rawApiResponse != null) ...[
+                  const SizedBox(height: 24),
+                  Card(
+                    elevation: 8,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(16),
+                    ),
+                    color: Colors.grey.shade100,
+                    child: Padding(
+                      padding: const EdgeInsets.all(20.0),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Raw API Response (for debugging):',
+                            style: TextStyle(
+                              fontWeight: FontWeight.bold,
+                              fontSize: 14,
+                              color: Theme.of(context).colorScheme.onSurface,
+                            ),
                           ),
-                          textAlign: TextAlign.center,
+                          const SizedBox(height: 10),
+                          Text(
+                            _rawApiResponse!,
+                            style: const TextStyle(
+                              fontFamily: 'monospace',
+                              fontSize: 12,
+                              color: Colors.black87,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
+
+                const SizedBox(height: 24),
+                
+                // Status Message
+                if (_statusMessage.isNotEmpty)
+                  Card(
+                    elevation: 8,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(16),
+                    ),
+                    color: Colors.blue.shade100,
+                    child: Padding(
+                      padding: const EdgeInsets.all(20.0),
+                      child: Text(
+                        _statusMessage,
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w600,
+                          color: Colors.blue.shade800,
                         ),
+                        textAlign: TextAlign.center,
                       ),
                     ),
                   ),
@@ -541,3 +664,4 @@ class _HomeScreenState extends State<HomeScreen> {
     super.dispose();
   }
 }
+
